@@ -1,3 +1,153 @@
+# <!-- rdoc-file=ext/bigdecimal/bigdecimal.c -->
+# BigDecimal provides arbitrary-precision floating point decimal arithmetic.
+#
+# ## Introduction
+#
+# Ruby provides built-in support for arbitrary precision integer arithmetic.
+#
+# For example:
+#
+#     42**13  #=>   1265437718438866624512
+#
+# BigDecimal provides similar support for very large or very accurate floating
+# point numbers.
+#
+# Decimal arithmetic is also useful for general calculation, because it provides
+# the correct answers people expect--whereas normal binary floating point
+# arithmetic often introduces subtle errors because of the conversion between
+# base 10 and base 2.
+#
+# For example, try:
+#
+#     sum = 0
+#     10_000.times do
+#       sum = sum + 0.0001
+#     end
+#     print sum #=> 0.9999999999999062
+#
+# and contrast with the output from:
+#
+#     require 'bigdecimal'
+#
+#     sum = BigDecimal("0")
+#     10_000.times do
+#       sum = sum + BigDecimal("0.0001")
+#     end
+#     print sum #=> 0.1E1
+#
+# Similarly:
+#
+#     (BigDecimal("1.2") - BigDecimal("1.0")) == BigDecimal("0.2") #=> true
+#
+#     (1.2 - 1.0) == 0.2 #=> false
+#
+# ## A Note About Precision
+#
+# For a calculation using a BigDecimal and another `value`, the precision of the
+# result depends on the type of `value`:
+#
+# *   If `value` is a Float, the precision is Float::DIG + 1.
+# *   If `value` is a Rational, the precision is larger than Float::DIG + 1.
+# *   If `value` is a BigDecimal, the precision is `value`'s precision in the
+#     internal representation, which is platform-dependent.
+# *   If `value` is other object, the precision is determined by the result of
+#     +BigDecimal(value)+.
+#
+# ## Special features of accurate decimal arithmetic
+#
+# Because BigDecimal is more accurate than normal binary floating point
+# arithmetic, it requires some special values.
+#
+# ### Infinity
+#
+# BigDecimal sometimes needs to return infinity, for example if you divide a
+# value by zero.
+#
+#     BigDecimal("1.0") / BigDecimal("0.0")  #=> Infinity
+#     BigDecimal("-1.0") / BigDecimal("0.0")  #=> -Infinity
+#
+# You can represent infinite numbers to BigDecimal using the strings
+# `'Infinity'`, `'+Infinity'` and `'-Infinity'` (case-sensitive)
+#
+# ### Not a Number
+#
+# When a computation results in an undefined value, the special value `NaN` (for
+# 'not a number') is returned.
+#
+# Example:
+#
+#     BigDecimal("0.0") / BigDecimal("0.0") #=> NaN
+#
+# You can also create undefined values.
+#
+# NaN is never considered to be the same as any other value, even NaN itself:
+#
+#     n = BigDecimal('NaN')
+#     n == 0.0 #=> false
+#     n == n #=> false
+#
+# ### Positive and negative zero
+#
+# If a computation results in a value which is too small to be represented as a
+# BigDecimal within the currently specified limits of precision, zero must be
+# returned.
+#
+# If the value which is too small to be represented is negative, a BigDecimal
+# value of negative zero is returned.
+#
+#     BigDecimal("1.0") / BigDecimal("-Infinity") #=> -0.0
+#
+# If the value is positive, a value of positive zero is returned.
+#
+#     BigDecimal("1.0") / BigDecimal("Infinity") #=> 0.0
+#
+# (See BigDecimal.mode for how to specify limits of precision.)
+#
+# Note that `-0.0` and `0.0` are considered to be the same for the purposes of
+# comparison.
+#
+# Note also that in mathematics, there is no particular concept of negative or
+# positive zero; true mathematical zero has no sign.
+#
+# ## bigdecimal/util
+#
+# When you require `bigdecimal/util`, the #to_d method will be available on
+# BigDecimal and the native Integer, Float, Rational, and String classes:
+#
+#     require 'bigdecimal/util'
+#
+#     42.to_d         # => 0.42e2
+#     0.5.to_d        # => 0.5e0
+#     (2/3r).to_d(3)  # => 0.667e0
+#     "0.5".to_d      # => 0.5e0
+#
+# ## Methods for Working with JSON
+#
+# *   [::json_create](https://docs.ruby-lang.org/en/master/BigDecimal.html#metho
+#     d-c-json_create): Returns a new BigDecimal object constructed from the
+#     given object.
+# *   [#as_json](https://docs.ruby-lang.org/en/master/BigDecimal.html#method-i-a
+#     s_json): Returns a 2-element hash representing `self`.
+# *   [#to_json](https://docs.ruby-lang.org/en/master/BigDecimal.html#method-i-t
+#     o_json): Returns a JSON string representing `self`.
+#
+# These methods are provided by the [JSON gem](https://github.com/flori/json).
+# To make these methods available:
+#
+#     require 'json/add/bigdecimal'
+#
+# *   ## License
+#
+# Copyright (C) 2002 by Shigeo Kobayashi <shigeo@tinyforest.gr.jp>.
+#
+# BigDecimal is released under the Ruby and 2-clause BSD licenses. See
+# LICENSE.txt for details.
+#
+# Maintained by mrkn <mrkn@mrkn.jp> and ruby-core members.
+#
+# Documented by zzak <zachary@zacharyscott.net>, mathew <meta@pobox.com>, and
+# many other contributors.
+#
 class BigDecimal < Numeric
   # <!--
   #   rdoc-file=ext/bigdecimal/bigdecimal.c
@@ -20,8 +170,9 @@ class BigDecimal < Numeric
 
   # <!--
   #   rdoc-file=ext/bigdecimal/bigdecimal.c
-  #   - interpret_loosely(p1)
+  #   - BigDecimal.interpret_loosely(string) -> bigdecimal
   # -->
+  # Returns the `BigDecimal` converted loosely from `string`.
   #
   def self.interpret_loosely: (string) -> BigDecimal
 
@@ -261,8 +412,13 @@ class BigDecimal < Numeric
 
   # <!--
   #   rdoc-file=ext/bigdecimal/bigdecimal.c
-  #   - *(p1)
+  #   - a * b   -> bigdecimal
   # -->
+  # Multiply by the specified value.
+  #
+  # The result precision will be the precision of the sum of each precision.
+  #
+  # See BigDecimal#mult.
   #
   def *: (Numeric) -> BigDecimal
 
@@ -831,7 +987,7 @@ class BigDecimal < Numeric
   #   - round(n, mode)
   # -->
   # Round to the nearest integer (by default), returning the result as a
-  # BigDecimal if n is specified, or as an Integer if it isn't.
+  # BigDecimal if n is specified and positive, or as an Integer if it isn't.
   #
   #     BigDecimal('3.14159').round #=> 3
   #     BigDecimal('8.7').round #=> 9
@@ -839,6 +995,7 @@ class BigDecimal < Numeric
   #
   #     BigDecimal('3.14159').round(2).class.name #=> "BigDecimal"
   #     BigDecimal('3.14159').round.class.name #=> "Integer"
+  #     BigDecimal('3.14159').round(0).class.name #=> "Integer"
   #
   # If n is specified and positive, the fractional part of the result has no more
   # than that many digits.
@@ -1050,7 +1207,7 @@ class BigDecimal < Numeric
   def zero?: () -> bool
 
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - a.to_d -> bigdecimal
   # -->
   # Returns self.
@@ -1112,10 +1269,13 @@ BigDecimal::EXCEPTION_UNDERFLOW: Integer
 BigDecimal::EXCEPTION_ZERODIVIDE: Integer
 
 # <!-- rdoc-file=ext/bigdecimal/bigdecimal.c -->
-# Special value constants
+# Positive [infinity](rdoc-ref:BigDecimal@Infinity) value.
 #
 BigDecimal::INFINITY: BigDecimal
 
+# <!-- rdoc-file=ext/bigdecimal/bigdecimal.c -->
+# '[Not a Number](rdoc-ref:BigDecimal@Not+a+Number)' value.
+#
 BigDecimal::NAN: BigDecimal
 
 # <!-- rdoc-file=ext/bigdecimal/bigdecimal.c -->
@@ -1258,7 +1418,7 @@ end
 %a{annotate:rdoc:skip}
 class Integer
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - int.to_d  -> bigdecimal
   # -->
   # Returns the value of `int` as a BigDecimal.
@@ -1344,7 +1504,7 @@ end
 %a{annotate:rdoc:skip}
 class Float
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - float.to_d             -> bigdecimal
   #   - float.to_d(precision)  -> bigdecimal
   # -->
@@ -1428,7 +1588,7 @@ end
 %a{annotate:rdoc:skip}
 class String
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - str.to_d  -> bigdecimal
   # -->
   # Returns the result of interpreting leading characters in `str` as a
@@ -1449,7 +1609,7 @@ end
 %a{annotate:rdoc:skip}
 class Rational
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - rat.to_d(precision)  -> bigdecimal
   # -->
   # Returns the value as a BigDecimal.
@@ -1531,7 +1691,7 @@ end
 %a{annotate:rdoc:skip}
 class Complex
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - cmp.to_d             -> bigdecimal
   #   - cmp.to_d(precision)  -> bigdecimal
   # -->
@@ -1615,7 +1775,7 @@ end
 %a{annotate:rdoc:skip}
 class NilClass
   # <!--
-  #   rdoc-file=ext/bigdecimal/lib/bigdecimal/util.rb
+  #   rdoc-file=lib/bigdecimal/util.rb
   #   - nil.to_d -> bigdecimal
   # -->
   # Returns nil represented as a BigDecimal.
