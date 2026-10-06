@@ -17,6 +17,7 @@ require "prism"
 
 require "rbs/errors"
 require "rbs/buffer"
+require "rbs/lazy_location"
 require "rbs/namespace"
 require "rbs/type_name"
 require "rbs/types"

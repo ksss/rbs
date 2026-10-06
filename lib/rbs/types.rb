@@ -40,10 +40,13 @@ module RBS
 
     module Bases
       class Base
+        prepend LazyLocation
+
         attr_reader :location
 
-        def initialize(location:)
+        def initialize(location:, buffer: nil)
           @location = location
+          @buffer = buffer
         end
 
         def ==(other)
@@ -107,8 +110,8 @@ module RBS
       class Bool < Base; end
       class Void < Base; end
       class Any < Base
-        def initialize(location:, todo: false)
-          super(location: location)
+        def initialize(location:, todo: false, buffer: nil)
+          super(location: location, buffer: buffer)
           if todo
             @string = "__todo__"
           end
@@ -131,14 +134,17 @@ module RBS
     end
 
     class Variable
+      prepend LazyLocation
+
       attr_reader :name
       attr_reader :location
 
       include NoTypeName
 
-      def initialize(name:, location:)
+      def initialize(name:, location:, buffer: nil)
         @name = name
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -450,12 +456,15 @@ module RBS
     end
 
     class Tuple
+      prepend LazyLocation
+
       attr_reader :types
       attr_reader :location
 
-      def initialize(types:, location:)
+      def initialize(types:, location:, buffer: nil)
         @types = types
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -484,7 +493,7 @@ module RBS
         return self if s.empty?
 
         self.class.new(types: types.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def to_s(level = 0)
@@ -506,7 +515,7 @@ module RBS
       def map_type_name(&block)
         Tuple.new(
           types: types.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -514,7 +523,7 @@ module RBS
         if block
           Tuple.new(
             types: types.map {|type| yield type },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -535,10 +544,12 @@ module RBS
     end
 
     class Record
+      prepend LazyLocation
+
       attr_reader :all_fields, :fields, :optional_fields
       attr_reader :location
 
-      def initialize(all_fields: nil, fields: nil, location:)
+      def initialize(all_fields: nil, fields: nil, location:, buffer: nil)
         case
         when fields && all_fields.nil?
           @all_fields = fields.transform_values { |v| [v, true] }
@@ -560,6 +571,7 @@ module RBS
         end
 
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -592,7 +604,7 @@ module RBS
 
         self.class.new(
           all_fields: all_fields.transform_values {|ty, required| [ty.sub(s), required] },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -624,7 +636,7 @@ module RBS
       def map_type_name(&block)
         Record.new(
           all_fields: all_fields.transform_values {|ty, required| [ty.map_type_name(&block), required] },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -632,7 +644,7 @@ module RBS
         if block
           Record.new(
             all_fields: all_fields.transform_values {|type, required| [yield(type), required] },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -653,12 +665,15 @@ module RBS
     end
 
     class Optional
+      prepend LazyLocation
+
       attr_reader :type
       attr_reader :location
 
-      def initialize(type:, location:)
+      def initialize(type:, location:, buffer: nil)
         @type = type
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -682,7 +697,7 @@ module RBS
       def sub(s)
         return self if s.empty?
 
-        self.class.new(type: type.sub(s), location: location)
+        self.class.new(type: type.sub(s), location: @location, buffer: @buffer)
       end
 
       def to_s(level = 0)
@@ -710,7 +725,7 @@ module RBS
       def map_type_name(&block)
         Optional.new(
           type: type.map_type_name(&block),
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -718,7 +733,7 @@ module RBS
         if block
           Optional.new(
             type: yield(type),
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -739,12 +754,15 @@ module RBS
     end
 
     class Union
+      prepend LazyLocation
+
       attr_reader :types
       attr_reader :location
 
-      def initialize(types:, location:)
+      def initialize(types:, location:, buffer: nil)
         @types = types
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -773,7 +791,7 @@ module RBS
         return self if s.empty?
 
         self.class.new(types: types.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def to_s(level = 0)
@@ -803,7 +821,7 @@ module RBS
 
       def map_type(&block)
         if block
-          Union.new(types: types.map(&block), location: location)
+          Union.new(types: types.map(&block), location: @location, buffer: @buffer)
         else
           enum_for :map_type
         end
@@ -812,7 +830,7 @@ module RBS
       def map_type_name(&block)
         Union.new(
           types: types.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -830,12 +848,15 @@ module RBS
     end
 
     class Intersection
+      prepend LazyLocation
+
       attr_reader :types
       attr_reader :location
 
-      def initialize(types:, location:)
+      def initialize(types:, location:, buffer: nil)
         @types = types
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
@@ -864,7 +885,7 @@ module RBS
         return self if s.empty?
 
         self.class.new(types: types.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def to_s(level = 0)
@@ -886,7 +907,7 @@ module RBS
 
       def map_type(&block)
         if block
-          Intersection.new(types: types.map(&block), location: location)
+          Intersection.new(types: types.map(&block), location: @location, buffer: @buffer)
         else
           enum_for :map_type
         end
@@ -895,7 +916,7 @@ module RBS
       def map_type_name(&block)
         Intersection.new(
           types: types.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -960,10 +981,13 @@ module RBS
       end
 
       class ForwardingParam
+        prepend LazyLocation
+
         attr_reader :location
 
-        def initialize(location:)
+        def initialize(location:, buffer: nil)
           @location = location
+          @buffer = buffer
         end
 
         def ==(other)
@@ -1388,13 +1412,16 @@ module RBS
     end
 
     class Block
+      prepend LazyLocation
+
       attr_reader :type
       attr_reader :required
       attr_reader :self_type
       attr_reader :location
 
-      def initialize(location: nil, type:, required:, self_type: nil)
+      def initialize(location: nil, type:, required:, self_type: nil, buffer: nil)
         @location = location
+        @buffer = buffer
         @type = type
         @required = required ? true : false
         @self_type = self_type
@@ -1453,15 +1480,18 @@ module RBS
     end
 
     class Proc
+      prepend LazyLocation
+
       attr_reader :type
       attr_reader :block
       attr_reader :self_type
       attr_reader :location
 
-      def initialize(location:, type:, block:, self_type: nil)
+      def initialize(location:, type:, block:, self_type: nil, buffer: nil)
         @type = type
         @block = block
         @location = location
+        @buffer = buffer
         @self_type = self_type
       end
 
@@ -1499,7 +1529,7 @@ module RBS
           type: type.sub(s),
           block: block&.sub(s),
           self_type: self_type&.sub(s),
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -1537,7 +1567,7 @@ module RBS
           type: type.map_type_name(&block),
           block: self.block&.map_type {|type| type.map_type_name(&block) },
           self_type: self_type&.map_type_name(&block),
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -1547,7 +1577,7 @@ module RBS
             type: type.map_type(&block),
             block: self.block&.map_type(&block),
             self_type: self_type ? yield(self_type) : nil,
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -1576,12 +1606,15 @@ module RBS
     end
 
     class Literal
+      prepend LazyLocation
+
       attr_reader :literal
       attr_reader :location
 
-      def initialize(literal:, location:)
+      def initialize(literal:, location:, buffer: nil)
         @literal = literal
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)

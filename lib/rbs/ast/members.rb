@@ -363,10 +363,13 @@ module RBS
       end
 
       module LocationOnly
+        prepend LazyLocation
+
         attr_reader :location
 
-        def initialize(location:)
+        def initialize(location:, buffer: nil)
           @location = location
+          @buffer = buffer
         end
 
         def ==(other)

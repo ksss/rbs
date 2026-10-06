@@ -54,6 +54,16 @@ VALUE rbs_location_range_to_ruby_location(rbs_translation_context_t ctx, rbs_loc
     return rbs_new_location2(ctx.buffer, range.start_char, range.end_char);
 }
 
+// Prototype: `(start_char << 32) | length` as an Integer, materialized by `RBS::LazyLocation#location`.
+static VALUE rbs_location_range_to_packed_location(rbs_location_range range) {
+    if (RBS_LOCATION_NULL_RANGE_P(range)) {
+        return Qnil;
+    }
+
+    uint64_t packed = ((uint64_t) range.start_char << 32) | (uint32_t) (range.end_char - range.start_char);
+    return ULL2NUM(packed);
+}
+
 VALUE rbs_location_range_list_to_ruby_array(rbs_translation_context_t ctx, rbs_location_range_list_t *list) {
     if (list == NULL) {
         return EMPTY_ARRAY;
@@ -203,8 +213,10 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
                     <%- end -%>
                 <%- end -%>
         }
-            <%- else -%>
+            <%- elsif node.ruby_full_name.start_with?("RBS::AST::Ruby::") -%>
         VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+            <%- else -%>
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
             <%- end -%>
         <%- end -%>
         <%- node.fields.each do |field| -%>
@@ -256,6 +268,9 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rb_hash_clear(h);
         <%- if node.expose_location? -%>
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+            <%- if !node.locations && !node.ruby_full_name.start_with?("RBS::AST::Ruby::") -%>
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
+            <%- end -%>
         <%- end -%>
         <%- node.fields.each do |field| -%>
         rb_hash_aset(h, ID2SYM(rb_intern("<%= field.name %>")), arg_<%= field.name %>);

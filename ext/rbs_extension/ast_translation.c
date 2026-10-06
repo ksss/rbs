@@ -61,6 +61,16 @@ VALUE rbs_location_range_to_ruby_location(rbs_translation_context_t ctx, rbs_loc
     return rbs_new_location2(ctx.buffer, range.start_char, range.end_char);
 }
 
+// Prototype: `(start_char << 32) | length` as an Integer, materialized by `RBS::LazyLocation#location`.
+static VALUE rbs_location_range_to_packed_location(rbs_location_range range) {
+    if (RBS_LOCATION_NULL_RANGE_P(range)) {
+        return Qnil;
+    }
+
+    uint64_t packed = ((uint64_t) range.start_char << 32) | (uint32_t) (range.end_char - range.start_char);
+    return ULL2NUM(packed);
+}
+
 VALUE rbs_location_range_list_to_ruby_array(rbs_translation_context_t ctx, rbs_location_range_list_t *list) {
     if (list == NULL) {
         return EMPTY_ARRAY;
@@ -209,7 +219,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_annotation_t *node = (rbs_ast_annotation_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_string = rbs_string_to_ruby_string(&node->string, ctx.encoding);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -217,6 +227,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("string")), arg_string);
         return CLASS_NEW_INSTANCE(RBS_AST_Annotation, 1, &h);
     }
@@ -227,7 +238,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_comment_t *node = (rbs_ast_comment_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_string = rbs_string_to_ruby_string(&node->string, ctx.encoding);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -235,6 +246,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("string")), arg_string);
         return CLASS_NEW_INSTANCE(RBS_AST_Comment, 1, &h);
     }
@@ -987,26 +999,28 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_private_t *node = (rbs_ast_members_private_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_AST_Members_Private, 1, &h);
     }
     case RBS_AST_MEMBERS_PUBLIC: {
         rbs_ast_members_public_t *node = (rbs_ast_members_public_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_AST_Members_Public, 1, &h);
     }
     case RBS_AST_RUBY_ANNOTATIONS_BLOCK_PARAM_TYPE_ANNOTATION: {
@@ -1445,7 +1459,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_bases_any_t *node = (rbs_types_bases_any_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_todo = node->todo ? Qtrue : Qfalse;
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1453,6 +1467,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("todo")), arg_todo);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Any, 1, &h);
     }
@@ -1460,111 +1475,119 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_bases_bool_t *node = (rbs_types_bases_bool_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Bool, 1, &h);
     }
     case RBS_TYPES_BASES_BOTTOM: {
         rbs_types_bases_bottom_t *node = (rbs_types_bases_bottom_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Bottom, 1, &h);
     }
     case RBS_TYPES_BASES_CLASS: {
         rbs_types_bases_class_t *node = (rbs_types_bases_class_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Class, 1, &h);
     }
     case RBS_TYPES_BASES_INSTANCE: {
         rbs_types_bases_instance_t *node = (rbs_types_bases_instance_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Instance, 1, &h);
     }
     case RBS_TYPES_BASES_NIL: {
         rbs_types_bases_nil_t *node = (rbs_types_bases_nil_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Nil, 1, &h);
     }
     case RBS_TYPES_BASES_SELF: {
         rbs_types_bases_self_t *node = (rbs_types_bases_self_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Self, 1, &h);
     }
     case RBS_TYPES_BASES_TOP: {
         rbs_types_bases_top_t *node = (rbs_types_bases_top_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Top, 1, &h);
     }
     case RBS_TYPES_BASES_VOID: {
         rbs_types_bases_void_t *node = (rbs_types_bases_void_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Bases_Void, 1, &h);
     }
     case RBS_TYPES_BLOCK: {
         rbs_types_block_t *node = (rbs_types_block_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
         VALUE arg_required = node->required ? Qtrue : Qfalse;
         VALUE arg_self_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->self_type); // rbs_node
@@ -1574,6 +1597,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("required")), arg_required);
         rb_hash_aset(h, ID2SYM(rb_intern("self_type")), arg_self_type);
@@ -1658,13 +1682,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_function_forwarding_param_t *node = (rbs_types_function_forwarding_param_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
         // Must not recurse between `rb_hash_clear()` and `CLASS_NEW_INSTANCE()`.
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         return CLASS_NEW_INSTANCE(RBS_Types_Function_ForwardingParam, 1, &h);
     }
     case RBS_TYPES_FUNCTION_PARAM: {
@@ -1716,7 +1741,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_intersection_t *node = (rbs_types_intersection_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_types = rbs_node_list_to_ruby_array(ctx, node->types);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1724,6 +1749,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("types")), arg_types);
         return CLASS_NEW_INSTANCE(RBS_Types_Intersection, 1, &h);
     }
@@ -1731,7 +1757,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_literal_t *node = (rbs_types_literal_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_literal = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->literal); // rbs_node
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1739,6 +1765,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("literal")), arg_literal);
         return CLASS_NEW_INSTANCE(RBS_Types_Literal, 1, &h);
     }
@@ -1746,7 +1773,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_optional_t *node = (rbs_types_optional_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1754,6 +1781,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         return CLASS_NEW_INSTANCE(RBS_Types_Optional, 1, &h);
     }
@@ -1761,7 +1789,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_proc_t *node = (rbs_types_proc_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);           // rbs_node
         VALUE arg_block = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->block);         // rbs_types_block
         VALUE arg_self_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->self_type); // rbs_node
@@ -1771,6 +1799,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("block")), arg_block);
         rb_hash_aset(h, ID2SYM(rb_intern("self_type")), arg_self_type);
@@ -1780,7 +1809,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_record_t *node = (rbs_types_record_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_all_fields = rbs_hash_to_ruby_hash(ctx, node->all_fields);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1788,6 +1817,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("all_fields")), arg_all_fields);
         return CLASS_NEW_INSTANCE(RBS_Types_Record, 1, &h);
     }
@@ -1803,7 +1833,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_tuple_t *node = (rbs_types_tuple_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_types = rbs_node_list_to_ruby_array(ctx, node->types);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1811,6 +1841,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("types")), arg_types);
         return CLASS_NEW_INSTANCE(RBS_Types_Tuple, 1, &h);
     }
@@ -1818,7 +1849,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_union_t *node = (rbs_types_union_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_types = rbs_node_list_to_ruby_array(ctx, node->types);
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1826,6 +1857,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("types")), arg_types);
         return CLASS_NEW_INSTANCE(RBS_Types_Union, 1, &h);
     }
@@ -1846,7 +1878,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_variable_t *node = (rbs_types_variable_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
+        VALUE arg_location = rbs_location_range_to_packed_location(node->base.location);
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
 
         // Claim the shared kwargs hash, clear it, fill it, and hand it to `.new`.
@@ -1854,6 +1886,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         return CLASS_NEW_INSTANCE(RBS_Types_Variable, 1, &h);
     }

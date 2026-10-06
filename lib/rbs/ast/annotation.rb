@@ -3,12 +3,15 @@
 module RBS
   module AST
     class Annotation
+      prepend LazyLocation
+
       attr_reader :string
       attr_reader :location
 
-      def initialize(string:, location:)
+      def initialize(string:, location:, buffer: nil)
         @string = string
         @location = location
+        @buffer = buffer
       end
 
       def ==(other)
