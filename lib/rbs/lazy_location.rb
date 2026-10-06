@@ -12,6 +12,20 @@ module RBS
   module LazyLocationPassThrough
     def __raw_location = @location
     def __location_buffer = @buffer
+
+    private
+
+    # `map_type_name` yields the location as the 2nd block argument, but most
+    # blocks ignore it (`|name, _, _|`). Materialize it only when the block
+    # actually names that parameter (or takes a rest parameter).
+    def __location_for_block(block)
+      params = block.parameters
+      wanted = params.any? { |type, _| type == :rest } || begin
+        type, name = params[1]
+        type && type != :block && !name.to_s.start_with?("_")
+      end
+      wanted ? location : nil
+    end
   end
 
   # For nodes without child locations: `@location` is `(start_pos << 32) | length`.

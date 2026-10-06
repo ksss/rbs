@@ -50,12 +50,12 @@ module RBS
       )
     end
 
-    def update(type_params: self.type_params, type: self.type, block: self.block, location: self.location)
+    def update(type_params: self.type_params, type: self.type, block: self.block, location: @location)
       self.class.new(
         type_params: type_params,
         type: type,
         block: block,
-        location: @location, buffer: @buffer
+        location: location, buffer: @buffer
       )
     end
 

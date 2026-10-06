@@ -309,7 +309,7 @@ module RBS
 
       def map_type_name(&block)
         ClassSingleton.new(
-          name: yield(name, location, self),
+          name: yield(name, __location_for_block(block), self),
           args: args.map {|type| type.map_type_name(&block) },
           location: @location, buffer: @buffer
         )
@@ -356,7 +356,7 @@ module RBS
 
       def map_type_name(&block)
         Interface.new(
-          name: yield(name, location, self),
+          name: yield(name, __location_for_block(block), self),
           args: args.map {|type| type.map_type_name(&block) },
           location: @location, buffer: @buffer
         )
@@ -403,7 +403,7 @@ module RBS
 
       def map_type_name(&block)
         ClassInstance.new(
-          name: yield(name, location, self),
+          name: yield(name, __location_for_block(block), self),
           args: args.map {|type| type.map_type_name(&block) },
           location: @location, buffer: @buffer
         )
@@ -448,7 +448,7 @@ module RBS
 
       def map_type_name(&block)
         Alias.new(
-          name: yield(name, location, self),
+          name: yield(name, __location_for_block(block), self),
           args: args.map {|arg| arg.map_type_name(&block) },
           location: @location, buffer: @buffer
         )

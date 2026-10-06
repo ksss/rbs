@@ -110,14 +110,14 @@ module RBS
           @comment = comment
         end
 
-        def update(name: self.name, type_params: self.type_params, super_class: self.super_class, members: self.members, annotations: self.annotations, location: self.location, comment: self.comment)
+        def update(name: self.name, type_params: self.type_params, super_class: self.super_class, members: self.members, annotations: self.annotations, location: @location, comment: self.comment)
           self.class.new(
             name: name,
             type_params: type_params,
             super_class: super_class,
             members: members,
             annotations: annotations,
-            location: @location, buffer: @buffer,
+            location: location, buffer: @buffer,
             comment: comment
           )
         end
@@ -216,14 +216,14 @@ module RBS
           @comment = comment
         end
 
-        def update(name: self.name, type_params: self.type_params, members: self.members, self_types: self.self_types, annotations: self.annotations, location: self.location, comment: self.comment)
+        def update(name: self.name, type_params: self.type_params, members: self.members, self_types: self.self_types, annotations: self.annotations, location: @location, comment: self.comment)
           self.class.new(
             name: name,
             type_params: type_params,
             members: members,
             self_types: self_types,
             annotations: annotations,
-            location: @location, buffer: @buffer,
+            location: location, buffer: @buffer,
             comment: comment
           )
         end
@@ -279,13 +279,13 @@ module RBS
           @comment = comment
         end
 
-        def update(name: self.name, type_params: self.type_params, members: self.members, annotations: self.annotations, location: self.location, comment: self.comment)
+        def update(name: self.name, type_params: self.type_params, members: self.members, annotations: self.annotations, location: @location, comment: self.comment)
           self.class.new(
             name: name,
             type_params: type_params,
             members: members,
             annotations: annotations,
-            location: @location, buffer: @buffer,
+            location: location, buffer: @buffer,
             comment: comment
           )
         end

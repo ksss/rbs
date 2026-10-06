@@ -93,13 +93,13 @@ module RBS
           overloading
         end
 
-        def update(name: self.name, kind: self.kind, overloads: self.overloads, annotations: self.annotations, location: self.location, comment: self.comment, overloading: self.overloading?, visibility: self.visibility)
+        def update(name: self.name, kind: self.kind, overloads: self.overloads, annotations: self.annotations, location: @location, comment: self.comment, overloading: self.overloading?, visibility: self.visibility)
           self.class.new(
             name: name,
             kind: kind,
             overloads: overloads,
             annotations: annotations,
-            location: @location, buffer: @buffer,
+            location: location, buffer: @buffer,
             comment: comment,
             overloading: overloading,
             visibility: visibility
@@ -317,7 +317,7 @@ module RBS
           name.hash ^ type.hash ^ ivar_name.hash ^ kind.hash ^ visibility.hash
         end
 
-        def update(name: self.name, type: self.type, ivar_name: self.ivar_name, kind: self.kind, annotations: self.annotations, location: self.location, comment: self.comment, visibility: self.visibility)
+        def update(name: self.name, type: self.type, ivar_name: self.ivar_name, kind: self.kind, annotations: self.annotations, location: @location, comment: self.comment, visibility: self.visibility)
           klass = _ = self.class
           klass.new(
             name: name,
@@ -325,7 +325,7 @@ module RBS
             ivar_name: ivar_name,
             kind: kind,
             annotations: annotations,
-            location: @location, buffer: @buffer,
+            location: location, buffer: @buffer,
             comment: comment,
             visibility: visibility
           )
