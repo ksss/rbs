@@ -264,13 +264,16 @@ module RBS
     end
 
     class ClassSingleton
+      prepend TableLocation
+
       attr_reader :location
 
       include Application
 
-      def initialize(name:, location:, args: [])
+      def initialize(name:, location:, args: [], buffer: nil)
         @name = name
         @location = location
+        @buffer = buffer
         @args = args
       end
 
@@ -289,7 +292,7 @@ module RBS
 
         self.class.new(name: name,
                        args: args.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def to_json(state = _ = nil)
@@ -308,7 +311,7 @@ module RBS
         ClassSingleton.new(
           name: yield(name, location, self),
           args: args.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -317,7 +320,7 @@ module RBS
           ClassSingleton.new(
             name: name,
             args: args.map {|type| yield type },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -326,14 +329,17 @@ module RBS
     end
 
     class Interface
+      prepend TableLocation
+
       attr_reader :location
 
       include Application
 
-      def initialize(name:, args:, location:)
+      def initialize(name:, args:, location:, buffer: nil)
         @name = name
         @args = args
         @location = location
+        @buffer = buffer
       end
 
       def to_json(state = nil)
@@ -345,14 +351,14 @@ module RBS
 
         self.class.new(name: name,
                        args: args.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def map_type_name(&block)
         Interface.new(
           name: yield(name, location, self),
           args: args.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -361,7 +367,7 @@ module RBS
           Interface.new(
             name: name,
             args: args.map {|type| yield type },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for(:map_type)
@@ -370,14 +376,17 @@ module RBS
     end
 
     class ClassInstance
+      prepend TableLocation
+
       attr_reader :location
 
       include Application
 
-      def initialize(name:, args:, location:)
+      def initialize(name:, args:, location:, buffer: nil)
         @name = name
         @args = args
         @location = location
+        @buffer = buffer
       end
 
       def to_json(state = nil)
@@ -389,14 +398,14 @@ module RBS
 
         self.class.new(name: name,
                        args: args.map {|ty| ty.sub(s) },
-                       location: location)
+                       location: @location, buffer: @buffer)
       end
 
       def map_type_name(&block)
         ClassInstance.new(
           name: yield(name, location, self),
           args: args.map {|type| type.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -405,7 +414,7 @@ module RBS
           ClassInstance.new(
             name: name,
             args: args.map {|type| yield type },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -414,14 +423,17 @@ module RBS
     end
 
     class Alias
+      prepend TableLocation
+
       attr_reader :location
 
       include Application
 
-      def initialize(name:, args:, location:)
+      def initialize(name:, args:, location:, buffer: nil)
         @name = name
         @args = args
         @location = location
+        @buffer = buffer
       end
 
       def to_json(state = nil)
@@ -431,14 +443,14 @@ module RBS
       def sub(s)
         return self if s.empty?
 
-        Alias.new(name: name, args: args.map {|ty| ty.sub(s) }, location: location)
+        Alias.new(name: name, args: args.map {|ty| ty.sub(s) }, location: @location, buffer: @buffer)
       end
 
       def map_type_name(&block)
         Alias.new(
           name: yield(name, location, self),
           args: args.map {|arg| arg.map_type_name(&block) },
-          location: location
+          location: @location, buffer: @buffer
         )
       end
 
@@ -447,7 +459,7 @@ module RBS
           Alias.new(
             name: name,
             args: args.map {|type| yield type },
-            location: location
+            location: @location, buffer: @buffer
           )
         else
           enum_for :map_type
@@ -935,14 +947,17 @@ module RBS
 
     class Function
       class Param
+        prepend TableLocation
+
         attr_reader :type
         attr_reader :name
         attr_reader :location
 
-        def initialize(type:, name:, location: nil)
+        def initialize(type:, name:, location: nil, buffer: nil)
           @type = type
           @name = name
           @location = location
+          @buffer = buffer
         end
 
         def ==(other)
@@ -957,7 +972,7 @@ module RBS
 
         def map_type(&block)
           if block
-            Param.new(name: name, type: yield(type), location: location)
+            Param.new(name: name, type: yield(type), location: @location, buffer: @buffer)
           else
             enum_for :map_type
           end

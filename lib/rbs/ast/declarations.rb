@@ -53,15 +53,20 @@ module RBS
       end
 
       class Class < Base
+        prepend TableLocation
+
         class Super
+          prepend TableLocation
+
           attr_reader :name
           attr_reader :args
           attr_reader :location
 
-          def initialize(name:, args:, location:)
+          def initialize(name:, args:, location:, buffer: nil)
             @name = name
             @args = args
             @location = location
+            @buffer = buffer
           end
 
           def ==(other)
@@ -94,13 +99,14 @@ module RBS
         attr_reader :location
         attr_reader :comment
 
-        def initialize(name:, type_params:, super_class:, members:, annotations:, location:, comment:)
+        def initialize(name:, type_params:, super_class:, members:, annotations:, location:, comment:, buffer: nil)
           @name = name
           @type_params = type_params
           @super_class = super_class
           @members = members
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -111,7 +117,7 @@ module RBS
             super_class: super_class,
             members: members,
             annotations: annotations,
-            location: location,
+            location: @location, buffer: @buffer,
             comment: comment
           )
         end
@@ -145,15 +151,20 @@ module RBS
       end
 
       class Module < Base
+        prepend TableLocation
+
         class Self
+          prepend TableLocation
+
           attr_reader :name
           attr_reader :args
           attr_reader :location
 
-          def initialize(name:, args:, location:)
+          def initialize(name:, args:, location:, buffer: nil)
             @name = name
             @args = args
             @location = location
+            @buffer = buffer
           end
 
           def ==(other)
@@ -194,13 +205,14 @@ module RBS
         attr_reader :self_types
         attr_reader :comment
 
-        def initialize(name:, type_params:, members:, self_types:, annotations:, location:, comment:)
+        def initialize(name:, type_params:, members:, self_types:, annotations:, location:, comment:, buffer: nil)
           @name = name
           @type_params = type_params
           @self_types = self_types
           @members = members
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -211,7 +223,7 @@ module RBS
             members: members,
             self_types: self_types,
             annotations: annotations,
-            location: location,
+            location: @location, buffer: @buffer,
             comment: comment
           )
         end
@@ -246,6 +258,8 @@ module RBS
       end
 
       class Interface < Base
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type_params
         attr_reader :members
@@ -255,12 +269,13 @@ module RBS
 
         include MixinHelper
 
-        def initialize(name:, type_params:, members:, annotations:, location:, comment:)
+        def initialize(name:, type_params:, members:, annotations:, location:, comment:, buffer: nil)
           @name = name
           @type_params = type_params
           @members = members
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -270,7 +285,7 @@ module RBS
             type_params: type_params,
             members: members,
             annotations: annotations,
-            location: location,
+            location: @location, buffer: @buffer,
             comment: comment
           )
         end
@@ -302,6 +317,8 @@ module RBS
       end
 
       class TypeAlias < Base
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type_params
         attr_reader :type
@@ -309,12 +326,13 @@ module RBS
         attr_reader :location
         attr_reader :comment
 
-        def initialize(name:, type_params:, type:, annotations:, location:, comment:)
+        def initialize(name:, type_params:, type:, annotations:, location:, comment:, buffer: nil)
           @name = name
           @type_params = type_params
           @type = type
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -345,16 +363,19 @@ module RBS
       end
 
       class Constant < Base
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type
         attr_reader :location
         attr_reader :comment
         attr_reader :annotations
 
-        def initialize(name:, type:, location:, comment:, annotations: [])
+        def initialize(name:, type:, location:, comment:, annotations: [], buffer: nil)
           @name = name
           @type = type
           @location = location
+          @buffer = buffer
           @comment = comment
           @annotations = annotations || []
         end
@@ -383,16 +404,19 @@ module RBS
       end
 
       class Global < Base
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type
         attr_reader :location
         attr_reader :comment
         attr_reader :annotations
 
-        def initialize(name:, type:, location:, comment:, annotations: [])
+        def initialize(name:, type:, location:, comment:, annotations: [], buffer: nil)
           @name = name
           @type = type
           @location = location
+          @buffer = buffer
           @comment = comment
           @annotations = annotations
         end
@@ -421,12 +445,15 @@ module RBS
       end
 
       class AliasDecl < Base
+        prepend TableLocation
+
         attr_reader :new_name, :old_name, :location, :comment, :annotations
 
-        def initialize(new_name:, old_name:, location:, comment:, annotations: [])
+        def initialize(new_name:, old_name:, location:, comment:, annotations: [], buffer: nil)
           @new_name = new_name
           @old_name = old_name
           @location = location
+          @buffer = buffer
           @comment = comment
           @annotations = annotations
         end
@@ -445,6 +472,8 @@ module RBS
       end
 
       class ClassAlias < AliasDecl
+        prepend TableLocation
+
         def to_json(state = nil)
           {
             declaration: :class_alias,
@@ -457,6 +486,8 @@ module RBS
       end
 
       class ModuleAlias < AliasDecl
+        prepend TableLocation
+
         def to_json(state = nil)
           {
             declaration: :module_alias,

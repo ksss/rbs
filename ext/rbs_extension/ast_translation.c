@@ -10,6 +10,7 @@
 #include "class_constants.h"
 #include "rbs_string_bridging.h"
 #include "legacy_location.h"
+#include "location_table.h"
 
 VALUE EMPTY_ARRAY;
 VALUE EMPTY_HASH;
@@ -24,7 +25,309 @@ rbs_translation_context_t rbs_translation_context_create(rbs_constant_pool_t *co
         .buffer = buffer,
         .encoding = ruby_encoding,
         .reusable_kwargs_hash = rb_hash_new(),
+        .location_table = rbs_location_table_for(buffer),
     };
+}
+
+static const rbs_location_schema_entry_t rbs_ast_declarations_class_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "end", true },
+    { "type_params", false },
+    { "lt", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_class_super_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_class_alias_location_schema[] = {
+    { "keyword", true },
+    { "new_name", true },
+    { "eq", true },
+    { "old_name", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_constant_location_schema[] = {
+    { "name", true },
+    { "colon", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_global_location_schema[] = {
+    { "name", true },
+    { "colon", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_interface_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "end", true },
+    { "type_params", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_module_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "end", true },
+    { "type_params", false },
+    { "colon", false },
+    { "self_types", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_module_self_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_module_alias_location_schema[] = {
+    { "keyword", true },
+    { "new_name", true },
+    { "eq", true },
+    { "old_name", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_declarations_type_alias_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "eq", true },
+    { "type_params", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_directives_use_location_schema[] = {
+    { "keyword", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_directives_use_single_clause_location_schema[] = {
+    { "type_name", true },
+    { "keyword", false },
+    { "new_name", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_directives_use_wildcard_clause_location_schema[] = {
+    { "namespace", true },
+    { "star", true },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_alias_location_schema[] = {
+    { "keyword", true },
+    { "new_name", true },
+    { "old_name", true },
+    { "new_kind", false },
+    { "old_kind", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_attr_accessor_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+    { "ivar", false },
+    { "ivar_name", false },
+    { "visibility", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_attr_reader_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+    { "ivar", false },
+    { "ivar_name", false },
+    { "visibility", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_attr_writer_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+    { "ivar", false },
+    { "ivar_name", false },
+    { "visibility", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_class_instance_variable_location_schema[] = {
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_class_variable_location_schema[] = {
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_extend_location_schema[] = {
+    { "name", true },
+    { "keyword", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_include_location_schema[] = {
+    { "name", true },
+    { "keyword", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_instance_variable_location_schema[] = {
+    { "name", true },
+    { "colon", true },
+    { "kind", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_method_definition_location_schema[] = {
+    { "keyword", true },
+    { "name", true },
+    { "kind", false },
+    { "overloading", false },
+    { "visibility", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_members_prepend_location_schema[] = {
+    { "name", true },
+    { "keyword", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_ast_type_param_location_schema[] = {
+    { "name", true },
+    { "variance", false },
+    { "unchecked", false },
+    { "upper_bound", false },
+    { "lower_bound", false },
+    { "default", false },
+};
+static const rbs_location_schema_entry_t rbs_method_type_location_schema[] = {
+    { "type", true },
+    { "type_params", false },
+};
+static const rbs_location_schema_entry_t rbs_types_alias_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_types_class_instance_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_types_class_singleton_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+static const rbs_location_schema_entry_t rbs_types_function_param_location_schema[] = {
+    { "name", false },
+};
+static const rbs_location_schema_entry_t rbs_types_interface_location_schema[] = {
+    { "name", true },
+    { "args", false },
+};
+
+const rbs_location_schema_t *rbs_location_schema_for(int node_type) {
+    switch (node_type) {
+    case RBS_AST_DECLARATIONS_CLASS: {
+        static const rbs_location_schema_t schema = { 5, rbs_ast_declarations_class_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_CLASS_SUPER: {
+        static const rbs_location_schema_t schema = { 2, rbs_ast_declarations_class_super_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_CLASS_ALIAS: {
+        static const rbs_location_schema_t schema = { 4, rbs_ast_declarations_class_alias_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_CONSTANT: {
+        static const rbs_location_schema_t schema = { 2, rbs_ast_declarations_constant_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_GLOBAL: {
+        static const rbs_location_schema_t schema = { 2, rbs_ast_declarations_global_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_INTERFACE: {
+        static const rbs_location_schema_t schema = { 4, rbs_ast_declarations_interface_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_MODULE: {
+        static const rbs_location_schema_t schema = { 6, rbs_ast_declarations_module_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_MODULE_SELF: {
+        static const rbs_location_schema_t schema = { 2, rbs_ast_declarations_module_self_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_MODULE_ALIAS: {
+        static const rbs_location_schema_t schema = { 4, rbs_ast_declarations_module_alias_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DECLARATIONS_TYPE_ALIAS: {
+        static const rbs_location_schema_t schema = { 4, rbs_ast_declarations_type_alias_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DIRECTIVES_USE: {
+        static const rbs_location_schema_t schema = { 1, rbs_ast_directives_use_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DIRECTIVES_USE_SINGLE_CLAUSE: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_directives_use_single_clause_location_schema };
+        return &schema;
+    }
+    case RBS_AST_DIRECTIVES_USE_WILDCARD_CLAUSE: {
+        static const rbs_location_schema_t schema = { 2, rbs_ast_directives_use_wildcard_clause_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_ALIAS: {
+        static const rbs_location_schema_t schema = { 5, rbs_ast_members_alias_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_ATTR_ACCESSOR: {
+        static const rbs_location_schema_t schema = { 7, rbs_ast_members_attr_accessor_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_ATTR_READER: {
+        static const rbs_location_schema_t schema = { 7, rbs_ast_members_attr_reader_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_ATTR_WRITER: {
+        static const rbs_location_schema_t schema = { 7, rbs_ast_members_attr_writer_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_CLASS_INSTANCE_VARIABLE: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_class_instance_variable_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_CLASS_VARIABLE: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_class_variable_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_EXTEND: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_extend_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_INCLUDE: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_include_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_INSTANCE_VARIABLE: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_instance_variable_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_METHOD_DEFINITION: {
+        static const rbs_location_schema_t schema = { 5, rbs_ast_members_method_definition_location_schema };
+        return &schema;
+    }
+    case RBS_AST_MEMBERS_PREPEND: {
+        static const rbs_location_schema_t schema = { 3, rbs_ast_members_prepend_location_schema };
+        return &schema;
+    }
+    case RBS_AST_TYPE_PARAM: {
+        static const rbs_location_schema_t schema = { 6, rbs_ast_type_param_location_schema };
+        return &schema;
+    }
+    case RBS_METHOD_TYPE: {
+        static const rbs_location_schema_t schema = { 2, rbs_method_type_location_schema };
+        return &schema;
+    }
+    case RBS_TYPES_ALIAS: {
+        static const rbs_location_schema_t schema = { 2, rbs_types_alias_location_schema };
+        return &schema;
+    }
+    case RBS_TYPES_CLASS_INSTANCE: {
+        static const rbs_location_schema_t schema = { 2, rbs_types_class_instance_location_schema };
+        return &schema;
+    }
+    case RBS_TYPES_CLASS_SINGLETON: {
+        static const rbs_location_schema_t schema = { 2, rbs_types_class_singleton_location_schema };
+        return &schema;
+    }
+    case RBS_TYPES_FUNCTION_PARAM: {
+        static const rbs_location_schema_t schema = { 1, rbs_types_function_param_location_schema };
+        return &schema;
+    }
+    case RBS_TYPES_INTERFACE: {
+        static const rbs_location_schema_t schema = { 2, rbs_types_interface_location_schema };
+        return &schema;
+    }
+    default:
+        return NULL;
+    }
 }
 
 VALUE rbs_node_list_to_ruby_array(rbs_translation_context_t ctx, rbs_node_list_t *list) {
@@ -254,15 +557,16 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_class_t *node = (rbs_ast_declarations_class_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 5);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("end"), (rbs_loc_range) { .start = node->end_range.start_char, .end = node->end_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("type_params"), (rbs_loc_range) { .start = node->type_params_range.start_char, .end = node->type_params_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("lt"), (rbs_loc_range) { .start = node->lt_range.start_char, .end = node->lt_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->end_range,
+                node->type_params_range,
+                node->lt_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_CLASS, node->base.location, children, 5);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_type_params = rbs_node_list_to_ruby_array(ctx, node->type_params);
@@ -282,6 +586,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type_params")), arg_type_params);
         rb_hash_aset(h, ID2SYM(rb_intern("super_class")), arg_super_class);
@@ -294,12 +599,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_class_super_t *node = (rbs_ast_declarations_class_super_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_CLASS_SUPER, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -309,6 +615,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_AST_Declarations_Class_Super, 1, &h);
@@ -317,14 +624,15 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_class_alias_t *node = (rbs_ast_declarations_class_alias_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 4);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("new_name"), (rbs_loc_range) { .start = node->new_name_range.start_char, .end = node->new_name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("eq"), (rbs_loc_range) { .start = node->eq_range.start_char, .end = node->eq_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("old_name"), (rbs_loc_range) { .start = node->old_name_range.start_char, .end = node->old_name_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->new_name_range,
+                node->eq_range,
+                node->old_name_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_CLASS_ALIAS, node->base.location, children, 4);
         }
         VALUE arg_new_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->new_name); // rbs_type_name
         VALUE arg_old_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->old_name); // rbs_type_name
@@ -336,6 +644,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("new_name")), arg_new_name);
         rb_hash_aset(h, ID2SYM(rb_intern("old_name")), arg_old_name);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -346,12 +655,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_constant_t *node = (rbs_ast_declarations_constant_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->colon_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_CONSTANT, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);       // rbs_type_name
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);       // rbs_node
@@ -363,6 +673,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -373,12 +684,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_global_t *node = (rbs_ast_declarations_global_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->colon_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_GLOBAL, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);       // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);       // rbs_node
@@ -390,6 +702,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -400,14 +713,15 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_interface_t *node = (rbs_ast_declarations_interface_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 4);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("end"), (rbs_loc_range) { .start = node->end_range.start_char, .end = node->end_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("type_params"), (rbs_loc_range) { .start = node->type_params_range.start_char, .end = node->type_params_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->end_range,
+                node->type_params_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_INTERFACE, node->base.location, children, 4);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_type_params = rbs_node_list_to_ruby_array(ctx, node->type_params);
@@ -426,6 +740,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type_params")), arg_type_params);
         rb_hash_aset(h, ID2SYM(rb_intern("members")), arg_members);
@@ -437,16 +752,17 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_module_t *node = (rbs_ast_declarations_module_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 6);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("end"), (rbs_loc_range) { .start = node->end_range.start_char, .end = node->end_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("type_params"), (rbs_loc_range) { .start = node->type_params_range.start_char, .end = node->type_params_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("self_types"), (rbs_loc_range) { .start = node->self_types_range.start_char, .end = node->self_types_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->end_range,
+                node->type_params_range,
+                node->colon_range,
+                node->self_types_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_MODULE, node->base.location, children, 6);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_type_params = rbs_node_list_to_ruby_array(ctx, node->type_params);
@@ -466,6 +782,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type_params")), arg_type_params);
         rb_hash_aset(h, ID2SYM(rb_intern("self_types")), arg_self_types);
@@ -478,12 +795,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_module_self_t *node = (rbs_ast_declarations_module_self_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_MODULE_SELF, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -493,6 +811,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_AST_Declarations_Module_Self, 1, &h);
@@ -501,14 +820,15 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_module_alias_t *node = (rbs_ast_declarations_module_alias_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 4);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("new_name"), (rbs_loc_range) { .start = node->new_name_range.start_char, .end = node->new_name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("eq"), (rbs_loc_range) { .start = node->eq_range.start_char, .end = node->eq_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("old_name"), (rbs_loc_range) { .start = node->old_name_range.start_char, .end = node->old_name_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->new_name_range,
+                node->eq_range,
+                node->old_name_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_MODULE_ALIAS, node->base.location, children, 4);
         }
         VALUE arg_new_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->new_name); // rbs_type_name
         VALUE arg_old_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->old_name); // rbs_type_name
@@ -520,6 +840,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("new_name")), arg_new_name);
         rb_hash_aset(h, ID2SYM(rb_intern("old_name")), arg_old_name);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -530,14 +851,15 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_declarations_type_alias_t *node = (rbs_ast_declarations_type_alias_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 4);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("eq"), (rbs_loc_range) { .start = node->eq_range.start_char, .end = node->eq_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("type_params"), (rbs_loc_range) { .start = node->type_params_range.start_char, .end = node->type_params_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->eq_range,
+                node->type_params_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DECLARATIONS_TYPE_ALIAS, node->base.location, children, 4);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_type_params = rbs_node_list_to_ruby_array(ctx, node->type_params);
@@ -556,6 +878,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type_params")), arg_type_params);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
@@ -567,11 +890,12 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_directives_use_t *node = (rbs_ast_directives_use_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 1);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DIRECTIVES_USE, node->base.location, children, 1);
         }
         VALUE arg_clauses = rbs_node_list_to_ruby_array(ctx, node->clauses);
 
@@ -580,6 +904,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("clauses")), arg_clauses);
         return CLASS_NEW_INSTANCE(RBS_AST_Directives_Use, 1, &h);
     }
@@ -587,13 +912,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_directives_use_single_clause_t *node = (rbs_ast_directives_use_single_clause_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("type_name"), (rbs_loc_range) { .start = node->type_name_range.start_char, .end = node->type_name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("new_name"), (rbs_loc_range) { .start = node->new_name_range.start_char, .end = node->new_name_range.end_char });
+            const rbs_location_range children[] = {
+                node->type_name_range,
+                node->keyword_range,
+                node->new_name_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DIRECTIVES_USE_SINGLE_CLAUSE, node->base.location, children, 3);
         }
         VALUE arg_type_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type_name); // rbs_type_name
         VALUE arg_new_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->new_name);   // rbs_ast_symbol
@@ -603,6 +929,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type_name")), arg_type_name);
         rb_hash_aset(h, ID2SYM(rb_intern("new_name")), arg_new_name);
         return CLASS_NEW_INSTANCE(RBS_AST_Directives_Use_SingleClause, 1, &h);
@@ -611,12 +938,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_directives_use_wildcard_clause_t *node = (rbs_ast_directives_use_wildcard_clause_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("namespace"), (rbs_loc_range) { .start = node->namespace_range.start_char, .end = node->namespace_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("star"), (rbs_loc_range) { .start = node->star_range.start_char, .end = node->star_range.end_char });
+            const rbs_location_range children[] = {
+                node->namespace_range,
+                node->star_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_DIRECTIVES_USE_WILDCARD_CLAUSE, node->base.location, children, 2);
         }
         VALUE arg_namespace = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->rbs_namespace); // rbs_namespace
 
@@ -625,6 +953,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("namespace")), arg_namespace);
         return CLASS_NEW_INSTANCE(RBS_AST_Directives_Use_WildcardClause, 1, &h);
     }
@@ -640,15 +969,16 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_alias_t *node = (rbs_ast_members_alias_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 5);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("new_name"), (rbs_loc_range) { .start = node->new_name_range.start_char, .end = node->new_name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("old_name"), (rbs_loc_range) { .start = node->old_name_range.start_char, .end = node->old_name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("new_kind"), (rbs_loc_range) { .start = node->new_kind_range.start_char, .end = node->new_kind_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("old_kind"), (rbs_loc_range) { .start = node->old_kind_range.start_char, .end = node->old_kind_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->new_name_range,
+                node->old_name_range,
+                node->new_kind_range,
+                node->old_kind_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_ALIAS, node->base.location, children, 5);
         }
         VALUE arg_new_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->new_name); // rbs_ast_symbol
         VALUE arg_old_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->old_name); // rbs_ast_symbol
@@ -661,6 +991,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("new_name")), arg_new_name);
         rb_hash_aset(h, ID2SYM(rb_intern("old_name")), arg_old_name);
         rb_hash_aset(h, ID2SYM(rb_intern("kind")), arg_kind);
@@ -672,17 +1003,18 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_attr_accessor_t *node = (rbs_ast_members_attr_accessor_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 7);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar"), (rbs_loc_range) { .start = node->ivar_range.start_char, .end = node->ivar_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar_name"), (rbs_loc_range) { .start = node->ivar_name_range.start_char, .end = node->ivar_name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("visibility"), (rbs_loc_range) { .start = node->visibility_range.start_char, .end = node->visibility_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+                node->ivar_range,
+                node->ivar_name_range,
+                node->visibility_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_ATTR_ACCESSOR, node->base.location, children, 7);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
@@ -697,6 +1029,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("ivar_name")), arg_ivar_name);
@@ -710,17 +1043,18 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_attr_reader_t *node = (rbs_ast_members_attr_reader_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 7);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar"), (rbs_loc_range) { .start = node->ivar_range.start_char, .end = node->ivar_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar_name"), (rbs_loc_range) { .start = node->ivar_name_range.start_char, .end = node->ivar_name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("visibility"), (rbs_loc_range) { .start = node->visibility_range.start_char, .end = node->visibility_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+                node->ivar_range,
+                node->ivar_name_range,
+                node->visibility_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_ATTR_READER, node->base.location, children, 7);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
@@ -735,6 +1069,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("ivar_name")), arg_ivar_name);
@@ -748,17 +1083,18 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_attr_writer_t *node = (rbs_ast_members_attr_writer_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 7);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar"), (rbs_loc_range) { .start = node->ivar_range.start_char, .end = node->ivar_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("ivar_name"), (rbs_loc_range) { .start = node->ivar_name_range.start_char, .end = node->ivar_name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("visibility"), (rbs_loc_range) { .start = node->visibility_range.start_char, .end = node->visibility_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+                node->ivar_range,
+                node->ivar_name_range,
+                node->visibility_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_ATTR_WRITER, node->base.location, children, 7);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
@@ -773,6 +1109,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("ivar_name")), arg_ivar_name);
@@ -786,13 +1123,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_class_instance_variable_t *node = (rbs_ast_members_class_instance_variable_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_CLASS_INSTANCE_VARIABLE, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);       // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);       // rbs_node
@@ -803,6 +1141,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -812,13 +1151,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_class_variable_t *node = (rbs_ast_members_class_variable_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_CLASS_VARIABLE, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);       // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);       // rbs_node
@@ -829,6 +1169,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -838,13 +1179,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_extend_t *node = (rbs_ast_members_extend_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->keyword_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_EXTEND, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -856,6 +1198,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         rb_hash_aset(h, ID2SYM(rb_intern("annotations")), arg_annotations);
@@ -866,13 +1209,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_include_t *node = (rbs_ast_members_include_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->keyword_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_INCLUDE, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -884,6 +1228,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         rb_hash_aset(h, ID2SYM(rb_intern("annotations")), arg_annotations);
@@ -894,13 +1239,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_instance_variable_t *node = (rbs_ast_members_instance_variable_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("colon"), (rbs_loc_range) { .start = node->colon_range.start_char, .end = node->colon_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->colon_range,
+                node->kind_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_INSTANCE_VARIABLE, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);       // rbs_ast_symbol
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);       // rbs_node
@@ -911,6 +1257,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("comment")), arg_comment);
@@ -920,15 +1267,16 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_method_definition_t *node = (rbs_ast_members_method_definition_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 5);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("kind"), (rbs_loc_range) { .start = node->kind_range.start_char, .end = node->kind_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("overloading"), (rbs_loc_range) { .start = node->overloading_range.start_char, .end = node->overloading_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("visibility"), (rbs_loc_range) { .start = node->visibility_range.start_char, .end = node->visibility_range.end_char });
+            const rbs_location_range children[] = {
+                node->keyword_range,
+                node->name_range,
+                node->kind_range,
+                node->overloading_range,
+                node->visibility_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_METHOD_DEFINITION, node->base.location, children, 5);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
         VALUE arg_kind = rbs_method_definition_kind_to_ruby(node->kind);           // method_definition_kind
@@ -943,6 +1291,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("kind")), arg_kind);
         rb_hash_aset(h, ID2SYM(rb_intern("overloads")), arg_overloads);
@@ -971,13 +1320,14 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_members_prepend_t *node = (rbs_ast_members_prepend_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 3);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_required_child(loc, rb_intern("keyword"), (rbs_loc_range) { .start = node->keyword_range.start_char, .end = node->keyword_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->keyword_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_MEMBERS_PREPEND, node->base.location, children, 3);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -989,6 +1339,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         rb_hash_aset(h, ID2SYM(rb_intern("annotations")), arg_annotations);
@@ -1353,16 +1704,17 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_ast_type_param_t *node = (rbs_ast_type_param_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 6);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("variance"), (rbs_loc_range) { .start = node->variance_range.start_char, .end = node->variance_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("unchecked"), (rbs_loc_range) { .start = node->unchecked_range.start_char, .end = node->unchecked_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("upper_bound"), (rbs_loc_range) { .start = node->upper_bound_range.start_char, .end = node->upper_bound_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("lower_bound"), (rbs_loc_range) { .start = node->lower_bound_range.start_char, .end = node->lower_bound_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("default"), (rbs_loc_range) { .start = node->default_range.start_char, .end = node->default_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->variance_range,
+                node->unchecked_range,
+                node->upper_bound_range,
+                node->lower_bound_range,
+                node->default_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_AST_TYPE_PARAM, node->base.location, children, 6);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name);                 // rbs_ast_symbol
         VALUE arg_variance = rbs_type_param_variance_to_ruby(node->variance);                      // type_param_variance
@@ -1376,6 +1728,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("variance")), arg_variance);
         rb_hash_aset(h, ID2SYM(rb_intern("upper_bound")), arg_upper_bound);
@@ -1388,12 +1741,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_method_type_t *node = (rbs_method_type_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("type"), (rbs_loc_range) { .start = node->type_range.start_char, .end = node->type_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("type_params"), (rbs_loc_range) { .start = node->type_params_range.start_char, .end = node->type_params_range.end_char });
+            const rbs_location_range children[] = {
+                node->type_range,
+                node->type_params_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_METHOD_TYPE, node->base.location, children, 2);
         }
         VALUE arg_type_params = rbs_node_list_to_ruby_array(ctx, node->type_params);
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type);   // rbs_node
@@ -1410,6 +1764,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type_params")), arg_type_params);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("block")), arg_block);
@@ -1436,12 +1791,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_alias_t *node = (rbs_types_alias_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_TYPES_ALIAS, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -1451,6 +1807,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_Types_Alias, 1, &h);
@@ -1607,12 +1964,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_class_instance_t *node = (rbs_types_class_instance_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_TYPES_CLASS_INSTANCE, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -1622,6 +1980,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_Types_ClassInstance, 1, &h);
@@ -1630,12 +1989,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_class_singleton_t *node = (rbs_types_class_singleton_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_TYPES_CLASS_SINGLETON, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -1645,6 +2005,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_Types_ClassSingleton, 1, &h);
@@ -1696,11 +2057,12 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_function_param_t *node = (rbs_types_function_param_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 1);
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_TYPES_FUNCTION_PARAM, node->base.location, children, 1);
         }
         VALUE arg_type = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->type); // rbs_node
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_ast_symbol
@@ -1710,6 +2072,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("type")), arg_type);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         return CLASS_NEW_INSTANCE(RBS_Types_Function_Param, 1, &h);
@@ -1718,12 +2081,13 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rbs_types_interface_t *node = (rbs_types_interface_t *) instance;
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
-        VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
-        rbs_loc *loc = rbs_check_location(arg_location);
+        VALUE arg_location;
         {
-            rbs_loc_legacy_alloc_children(loc, 2);
-            rbs_loc_legacy_add_required_child(loc, rb_intern("name"), (rbs_loc_range) { .start = node->name_range.start_char, .end = node->name_range.end_char });
-            rbs_loc_legacy_add_optional_child(loc, rb_intern("args"), (rbs_loc_range) { .start = node->args_range.start_char, .end = node->args_range.end_char });
+            const rbs_location_range children[] = {
+                node->name_range,
+                node->args_range,
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, RBS_TYPES_INTERFACE, node->base.location, children, 2);
         }
         VALUE arg_name = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) node->name); // rbs_type_name
         VALUE arg_args = rbs_node_list_to_ruby_array(ctx, node->args);
@@ -1733,6 +2097,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         VALUE h = ctx.reusable_kwargs_hash;
         rb_hash_clear(h);
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
+        rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
         rb_hash_aset(h, ID2SYM(rb_intern("name")), arg_name);
         rb_hash_aset(h, ID2SYM(rb_intern("args")), arg_args);
         return CLASS_NEW_INSTANCE(RBS_Types_Interface, 1, &h);

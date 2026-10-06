@@ -3,14 +3,17 @@
 module RBS
   module AST
     class TypeParam
+      prepend TableLocation
+
       attr_reader :name, :variance, :location, :upper_bound_type, :lower_bound_type, :default_type
 
-      def initialize(name:, variance:, upper_bound:, lower_bound:, location:, default_type: nil, unchecked: false)
+      def initialize(name:, variance:, upper_bound:, lower_bound:, location:, default_type: nil, unchecked: false, buffer: nil)
         @name = name
         @variance = variance
         @upper_bound_type = upper_bound
         @lower_bound_type = lower_bound
         @location = location
+        @buffer = buffer
         @default_type = default_type
         @unchecked = unchecked
       end
@@ -84,7 +87,7 @@ module RBS
           variance: variance,
           upper_bound: _upper_bound_type,
           lower_bound: _lower_bound_type,
-          location: location,
+          location: @location, buffer: @buffer,
           default_type: _default_type
         ).unchecked!(unchecked?)
       end

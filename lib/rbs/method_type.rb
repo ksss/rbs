@@ -2,16 +2,19 @@
 
 module RBS
   class MethodType
+    prepend TableLocation
+
     attr_reader :type_params
     attr_reader :type
     attr_reader :block
     attr_reader :location
 
-    def initialize(type_params:, type:, block:, location:)
+    def initialize(type_params:, type:, block:, location:, buffer: nil)
       @type_params = type_params
       @type = type
       @block = block
       @location = location
+      @buffer = buffer
     end
 
     def ==(other)
@@ -43,7 +46,7 @@ module RBS
         end,
         type: type.sub(sub),
         block: block&.sub(sub),
-        location: location
+        location: @location, buffer: @buffer
       )
     end
 
@@ -52,7 +55,7 @@ module RBS
         type_params: type_params,
         type: type,
         block: block,
-        location: location
+        location: @location, buffer: @buffer
       )
     end
 
@@ -67,7 +70,7 @@ module RBS
         type_params: type_params,
         type: type.map_type(&block),
         block: self.block&.map_type(&block),
-        location: location
+        location: @location, buffer: @buffer
       )
     end
 

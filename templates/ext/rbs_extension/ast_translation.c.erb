@@ -3,6 +3,7 @@
 #include "class_constants.h"
 #include "rbs_string_bridging.h"
 #include "legacy_location.h"
+#include "location_table.h"
 
 VALUE EMPTY_ARRAY;
 VALUE EMPTY_HASH;
@@ -17,7 +18,30 @@ rbs_translation_context_t rbs_translation_context_create(rbs_constant_pool_t *co
         .buffer = buffer,
         .encoding = ruby_encoding,
         .reusable_kwargs_hash = rb_hash_new(),
+        .location_table = rbs_location_table_for(buffer),
     };
+}
+
+<%- table_nodes = nodes.select { |node| node.expose_location? && node.locations && !node.ruby_full_name.start_with?("RBS::AST::Ruby::") } -%>
+<%- table_nodes.each do |node| -%>
+static const rbs_location_schema_entry_t <%= node.c_node_enum_name.downcase %>_location_schema[] = {
+    <%- node.locations.each do |location_field| -%>
+    { "<%= location_field.name %>", <%= location_field.required? %> },
+    <%- end -%>
+};
+<%- end -%>
+
+const rbs_location_schema_t *rbs_location_schema_for(int node_type) {
+    switch (node_type) {
+    <%- table_nodes.each do |node| -%>
+    case <%= node.c_node_enum_name %>: {
+        static const rbs_location_schema_t schema = { <%= node.locations.size %>, <%= node.c_node_enum_name.downcase %>_location_schema };
+        return &schema;
+    }
+    <%- end -%>
+    default:
+        return NULL;
+    }
 }
 
 VALUE rbs_node_list_to_ruby_array(rbs_translation_context_t ctx, rbs_node_list_t *list) {
@@ -200,7 +224,17 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
 
         // Compute child VALUEs into locals variables first, before any recursion into `rbs_struct_to_ruby_value()`.
         <%- if node.expose_location? -%>
-            <%- if node.locations -%>
+            <%- if node.locations && !node.ruby_full_name.start_with?("RBS::AST::Ruby::") -%>
+        VALUE arg_location;
+        {
+            const rbs_location_range children[] = {
+                <%- node.locations.each do |location_field| -%>
+                node-><%= location_field.attribute_name %>,
+                <%- end -%>
+            };
+            arg_location = rbs_location_table_append(ctx.location_table, <%= node.c_node_enum_name %>, node->base.location, children, <%= node.locations.size %>);
+        }
+            <%- elsif node.locations -%>
         VALUE arg_location = rbs_location_range_to_ruby_location(ctx, node->base.location);
         rbs_loc *loc = rbs_check_location(arg_location);
         {
@@ -268,7 +302,7 @@ VALUE rbs_struct_to_ruby_value(rbs_translation_context_t ctx, rbs_node_t *instan
         rb_hash_clear(h);
         <%- if node.expose_location? -%>
         rb_hash_aset(h, ID2SYM(rb_intern("location")), arg_location);
-            <%- if !node.locations && !node.ruby_full_name.start_with?("RBS::AST::Ruby::") -%>
+            <%- if !node.ruby_full_name.start_with?("RBS::AST::Ruby::") -%>
         rb_hash_aset(h, ID2SYM(rb_intern("buffer")), ctx.buffer);
             <%- end -%>
         <%- end -%>

@@ -580,7 +580,7 @@ module RBS
         return AST::Declarations::Global.new(
           name: decl.name,
           type: absolute_type(resolver, map, decl.type, context: nil),
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           comment: decl.comment,
           annotations: decl.annotations
         )
@@ -599,7 +599,7 @@ module RBS
             AST::Declarations::Class::Super.new(
               name: absolute_type_name(resolver, map, super_class.name, context: outer_context),
               args: super_class.args.map {|type| absolute_type(resolver, map, type, context: outer_context) },
-              location: super_class.location
+              location: super_class.__raw_location, buffer: super_class.__location_buffer
             )
           end,
           members: decl.members.map do |member|
@@ -618,7 +618,7 @@ module RBS
               raise
             end
           end,
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           annotations: decl.annotations,
           comment: decl.comment
         )
@@ -635,7 +635,7 @@ module RBS
             AST::Declarations::Module::Self.new(
               name: absolute_type_name(resolver, map, module_self.name, context: inner_context),
               args: module_self.args.map {|type| absolute_type(resolver, map, type, context: inner_context) },
-              location: module_self.location
+              location: module_self.__raw_location, buffer: module_self.__location_buffer
             )
           end,
           members: decl.members.map do |member|
@@ -654,7 +654,7 @@ module RBS
               raise
             end
           end,
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           annotations: decl.annotations,
           comment: decl.comment
         )
@@ -667,7 +667,7 @@ module RBS
             resolve_member(resolver, map, member, context: context)
           end,
           comment: decl.comment,
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           annotations: decl.annotations
         )
 
@@ -676,7 +676,7 @@ module RBS
           name: decl.name.with_prefix(prefix),
           type_params: resolve_type_params(resolver, map, decl.type_params, context: context),
           type: absolute_type(resolver, map, decl.type, context: context),
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           annotations: decl.annotations,
           comment: decl.comment
         )
@@ -685,7 +685,7 @@ module RBS
         AST::Declarations::Constant.new(
           name: decl.name.with_prefix(prefix),
           type: absolute_type(resolver, map, decl.type, context: context),
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           comment: decl.comment,
           annotations: decl.annotations
         )
@@ -694,7 +694,7 @@ module RBS
         AST::Declarations::ClassAlias.new(
           new_name: decl.new_name.with_prefix(prefix),
           old_name: absolute_type_name(resolver, map, decl.old_name, context: context),
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           comment: decl.comment,
           annotations: decl.annotations
         )
@@ -703,7 +703,7 @@ module RBS
         AST::Declarations::ModuleAlias.new(
           new_name: decl.new_name.with_prefix(prefix),
           old_name: absolute_type_name(resolver, map, decl.old_name, context: context),
-          location: decl.location,
+          location: decl.__raw_location, buffer: decl.__location_buffer,
           comment: decl.comment,
           annotations: decl.annotations
         )
@@ -880,7 +880,7 @@ module RBS
           comment: member.comment,
           overloading: member.overloading?,
           annotations: member.annotations,
-          location: member.location,
+          location: member.__raw_location, buffer: member.__location_buffer,
           visibility: member.visibility
         )
       when AST::Members::AttrAccessor
@@ -890,7 +890,7 @@ module RBS
           kind: member.kind,
           annotations: member.annotations,
           comment: member.comment,
-          location: member.location,
+          location: member.__raw_location, buffer: member.__location_buffer,
           ivar_name: member.ivar_name,
           visibility: member.visibility
         )
@@ -901,7 +901,7 @@ module RBS
           kind: member.kind,
           annotations: member.annotations,
           comment: member.comment,
-          location: member.location,
+          location: member.__raw_location, buffer: member.__location_buffer,
           ivar_name: member.ivar_name,
           visibility: member.visibility
         )
@@ -912,7 +912,7 @@ module RBS
           kind: member.kind,
           annotations: member.annotations,
           comment: member.comment,
-          location: member.location,
+          location: member.__raw_location, buffer: member.__location_buffer,
           ivar_name: member.ivar_name,
           visibility: member.visibility
         )
@@ -921,21 +921,21 @@ module RBS
           name: member.name,
           type: absolute_type(resolver, map, member.type, context: context),
           comment: member.comment,
-          location: member.location
+          location: member.__raw_location, buffer: member.__location_buffer
         )
       when AST::Members::ClassInstanceVariable
         AST::Members::ClassInstanceVariable.new(
           name: member.name,
           type: absolute_type(resolver, map, member.type, context: context),
           comment: member.comment,
-          location: member.location
+          location: member.__raw_location, buffer: member.__location_buffer
         )
       when AST::Members::ClassVariable
         AST::Members::ClassVariable.new(
           name: member.name,
           type: absolute_type(resolver, map, member.type, context: context),
           comment: member.comment,
-          location: member.location
+          location: member.__raw_location, buffer: member.__location_buffer
         )
       when AST::Members::Include
         AST::Members::Include.new(

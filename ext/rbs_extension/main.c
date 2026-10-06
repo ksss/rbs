@@ -5,6 +5,7 @@
 #include "rbs/serialize.h"
 #include "ast_translation.h"
 #include "legacy_location.h"
+#include "location_table.h"
 #include "rbs_string_bridging.h"
 
 #include "ruby/vm.h"
@@ -143,7 +144,9 @@ static VALUE parse_type_try(VALUE a) {
         arg->encoding
     );
 
-    return rbs_struct_to_ruby_value(ctx, type);
+    VALUE result = rbs_struct_to_ruby_value(ctx, type);
+    rbs_location_table_shrink(ctx.location_table);
+    return result;
 }
 
 /**
@@ -265,7 +268,9 @@ static VALUE parse_method_type_try(VALUE a) {
         arg->encoding
     );
 
-    return rbs_struct_to_ruby_value(ctx, (rbs_node_t *) method_type);
+    VALUE result = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) method_type);
+    rbs_location_table_shrink(ctx.location_table);
+    return result;
 }
 
 static VALUE rbsparser_parse_method_type(VALUE self, VALUE buffer, VALUE start_pos, VALUE end_pos, VALUE variables, VALUE require_eof, VALUE enable_forwarding_params) {
@@ -304,7 +309,9 @@ static VALUE parse_signature_try(VALUE a) {
         arg->encoding
     );
 
-    return rbs_struct_to_ruby_value(ctx, (rbs_node_t *) signature);
+    VALUE result = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) signature);
+    rbs_location_table_shrink(ctx.location_table);
+    return result;
 }
 
 static VALUE rbsparser_parse_signature(VALUE self, VALUE buffer, VALUE start_pos, VALUE end_pos, VALUE enable_forwarding_params) {
@@ -521,7 +528,9 @@ static VALUE parse_inline_leading_annotation_try(VALUE a) {
         arg->encoding
     );
 
-    return rbs_struct_to_ruby_value(ctx, (rbs_node_t *) annotation);
+    VALUE result = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) annotation);
+    rbs_location_table_shrink(ctx.location_table);
+    return result;
 }
 
 static VALUE rbsparser_parse_inline_leading_annotation(VALUE self, VALUE buffer, VALUE start_pos, VALUE end_pos, VALUE variables) {
@@ -564,7 +573,9 @@ static VALUE parse_inline_trailing_annotation_try(VALUE a) {
         arg->encoding
     );
 
-    return rbs_struct_to_ruby_value(ctx, (rbs_node_t *) annotation);
+    VALUE result = rbs_struct_to_ruby_value(ctx, (rbs_node_t *) annotation);
+    rbs_location_table_shrink(ctx.location_table);
+    return result;
 }
 
 static VALUE rbsparser_parse_inline_trailing_annotation(VALUE self, VALUE buffer, VALUE start_pos, VALUE end_pos, VALUE variables) {
@@ -643,6 +654,7 @@ void Init_rbs_extension(void) {
 #endif
     rbs__init_constants();
     rbs__init_location();
+    rbs__init_location_table();
     rbs__init_parser();
 
     ruby_vm_at_exit(Deinit_rbs_extension);

@@ -7,6 +7,8 @@ module RBS
       end
 
       class MethodDefinition < Base
+        prepend TableLocation
+
         class Overload
           attr_reader :method_type, :annotations
 
@@ -52,12 +54,13 @@ module RBS
         attr_reader :overloading
         attr_reader :visibility
 
-        def initialize(name:, kind:, overloads:, annotations:, location:, comment:, overloading:, visibility:)
+        def initialize(name:, kind:, overloads:, annotations:, location:, comment:, overloading:, visibility:, buffer: nil)
           @name = name
           @kind = kind
           @overloads = overloads
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
           @overloading = overloading
           @visibility = visibility
@@ -96,7 +99,7 @@ module RBS
             kind: kind,
             overloads: overloads,
             annotations: annotations,
-            location: location,
+            location: @location, buffer: @buffer,
             comment: comment,
             overloading: overloading,
             visibility: visibility
@@ -119,15 +122,18 @@ module RBS
       end
 
       module Var
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type
         attr_reader :location
         attr_reader :comment
 
-        def initialize(name:, type:, location:, comment:)
+        def initialize(name:, type:, location:, comment:, buffer: nil)
           @name = name
           @type = type
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -143,6 +149,8 @@ module RBS
       end
 
       class InstanceVariable < Base
+        prepend TableLocation
+
         include Var
 
         def to_json(state = nil)
@@ -157,6 +165,8 @@ module RBS
       end
 
       class ClassInstanceVariable < Base
+        prepend TableLocation
+
         include Var
 
         def to_json(state = nil)
@@ -171,6 +181,8 @@ module RBS
       end
 
       class ClassVariable < Base
+        prepend TableLocation
+
         include Var
 
         def to_json(state = nil)
@@ -185,17 +197,20 @@ module RBS
       end
 
       module Mixin
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :args
         attr_reader :annotations
         attr_reader :location
         attr_reader :comment
 
-        def initialize(name:, args:, annotations:, location:, comment:)
+        def initialize(name:, args:, annotations:, location:, comment:, buffer: nil)
           @name = name
           @args = args
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
@@ -213,6 +228,8 @@ module RBS
       end
 
       class Include < Base
+        prepend TableLocation
+
         include Mixin
 
         def to_json(state = nil)
@@ -228,6 +245,8 @@ module RBS
       end
 
       class Extend < Base
+        prepend TableLocation
+
         include Mixin
 
         def to_json(state = nil)
@@ -243,6 +262,8 @@ module RBS
       end
 
       class Prepend < Base
+        prepend TableLocation
+
         include Mixin
 
         def to_json(state = nil)
@@ -258,6 +279,8 @@ module RBS
       end
 
       module Attribute
+        prepend TableLocation
+
         attr_reader :name
         attr_reader :type
         attr_reader :kind
@@ -267,12 +290,13 @@ module RBS
         attr_reader :comment
         attr_reader :visibility
 
-        def initialize(name:, type:, ivar_name:, kind:, annotations:, location:, comment:, visibility: nil)
+        def initialize(name:, type:, ivar_name:, kind:, annotations:, location:, comment:, visibility: nil, buffer: nil)
           @name = name
           @type = type
           @ivar_name = ivar_name
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
           @kind = kind
           @visibility = visibility
@@ -301,7 +325,7 @@ module RBS
             ivar_name: ivar_name,
             kind: kind,
             annotations: annotations,
-            location: location,
+            location: @location, buffer: @buffer,
             comment: comment,
             visibility: visibility
           )
@@ -309,6 +333,8 @@ module RBS
       end
 
       class AttrReader < Base
+        prepend TableLocation
+
         include Attribute
 
         def to_json(state = nil)
@@ -327,6 +353,8 @@ module RBS
       end
 
       class AttrAccessor < Base
+        prepend TableLocation
+
         include Attribute
 
         def to_json(state = nil)
@@ -345,6 +373,8 @@ module RBS
       end
 
       class AttrWriter < Base
+        prepend TableLocation
+
         include Attribute
 
         def to_json(state = nil)
@@ -400,6 +430,8 @@ module RBS
       end
 
       class Alias < Base
+        prepend TableLocation
+
         attr_reader :new_name
         attr_reader :old_name
         attr_reader :kind
@@ -407,12 +439,13 @@ module RBS
         attr_reader :location
         attr_reader :comment
 
-        def initialize(new_name:, old_name:, kind:, annotations:, location:, comment:)
+        def initialize(new_name:, old_name:, kind:, annotations:, location:, comment:, buffer: nil)
           @new_name = new_name
           @old_name = old_name
           @kind = kind
           @annotations = annotations
           @location = location
+          @buffer = buffer
           @comment = comment
         end
 
